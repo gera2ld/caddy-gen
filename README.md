@@ -43,3 +43,44 @@ networks:
 ```
 
 Caddy config will be generated automatically to proxy `my-service.example.com` to `my-service:80`.
+
+## Development
+
+This project is written in Go and uses Docker for containerization.
+
+### Building
+
+```bash
+# Build the Docker image
+just build
+
+# Push the Docker image
+just push
+
+# Run the Docker container
+just run
+
+# Run locally for development
+just dev
+```
+
+### Environment Variables
+
+- `CADDY_GEN_NETWORK`: The Docker network to monitor (default: `gateway`)
+- `CADDY_GEN_OUTFILE`: The output file for Caddy configuration (default: `docker-sites.caddy`)
+- `CADDY_GEN_NOTIFY`: JSON configuration for notifying Caddy to reload (format: `{"containerId":"caddy","workingDir":"/etc/caddy","command":["caddy","reload"]}`)
+
+### Label Format
+
+The `virtual.bind` label supports the following format:
+
+```
+[PATH] PORT HOSTNAME1 [HOSTNAME2...] [| DIRECTIVE1] [| DIRECTIVE2...]
+```
+
+- `PATH`: Optional path prefix for the reverse proxy
+- `PORT`: The port to proxy to
+- `HOSTNAME`: One or more hostnames to match
+- `DIRECTIVE`: Optional directives, prefixed with `host:` for host-level directives or without prefix for proxy-level directives
+
+Multiple bindings can be separated by semicolons (`;`).

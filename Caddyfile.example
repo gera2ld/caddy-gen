@@ -1,0 +1,10 @@
+*.example.org {
+    # Import generated sites
+    import sites/docker-sites.caddy
+}
+
+# Additional static sites
+example.org {
+    root * /var/www/example.org
+    file_server
+} 

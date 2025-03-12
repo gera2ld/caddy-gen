@@ -1,0 +1,45 @@
+services:
+  caddy:
+    image: gera2ld/caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./sites:/etc/caddy/sites
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - gateway
+
+  caddy-gen:
+    image: gera2ld/caddy-gen
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sites:/data
+    environment:
+      - CADDY_GEN_NETWORK=gateway
+      - CADDY_GEN_OUTFILE=/data/docker-sites.caddy
+      - CADDY_GEN_NOTIFY={"containerId":"caddy","workingDir":"/etc/caddy","command":["caddy","reload"]}
+
+  example-service:
+    image: nginx:alpine
+    restart: unless-stopped
+    labels:
+      virtual.bind: 80 example.com | host:tls {
+        dns cloudflare {env.CF_API_TOKEN}
+      } | header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+      }
+    networks:
+      - gateway
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  gateway:
+    external: true 
