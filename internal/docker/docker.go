@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -58,6 +59,13 @@ func (c *Client) createNetworkFilter() filters.Args {
 // Notify notifies the Caddy container to reload
 func (c *Client) Notify() {
 	if c.config.Notify == nil {
+		return
+	}
+	if c.config.Notify.ContainerID == "" {
+		name := c.config.Notify.Command[0]
+		args := c.config.Notify.Command[1:]
+		cmd := exec.Command(name, args...)
+		cmd.Run()
 		return
 	}
 	log.Printf("Notify: %+v", c.config.Notify)

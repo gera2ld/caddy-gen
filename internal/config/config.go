@@ -8,8 +8,8 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Network string       // Docker network to monitor
-	OutFile string       // Output file for Caddy configuration
+	Network string        // Docker network to monitor
+	OutFile string        // Output file for Caddy configuration
 	Notify  *NotifyConfig // Notification configuration
 }
 
@@ -39,15 +39,18 @@ func GetEnv(key, fallback string) string {
 
 // ParseNotifyConfig parses the notification configuration from a JSON string
 func ParseNotifyConfig(raw string) *NotifyConfig {
-	if raw == "" {
-		return nil
+	var config NotifyConfig
+
+	if raw != "" {
+		err := json.Unmarshal([]byte(raw), &config)
+		if err != nil {
+			log.Printf("Failed to parse CADDY_GEN_NOTIFY: %v", err)
+		}
 	}
 
-	var config NotifyConfig
-	err := json.Unmarshal([]byte(raw), &config)
-	if err != nil {
-		log.Printf("Failed to parse CADDY_GEN_NOTIFY: %v", err)
-		return nil
+	if len(config.Command) == 0 {
+		config.Command = []string{"caddy", "reload"}
 	}
+
 	return &config
-} 
+}
