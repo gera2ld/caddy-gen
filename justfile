@@ -1,9 +1,8 @@
-default: just --list
+default:
+  just --list
 
-build: docker build -t gera2ld/caddy-gen:latest .
+build:
+  CGO_ENABLED=0 go build -ldflags='-s -w' -trimpath -o caddy-gen .
 
-push: docker push gera2ld/caddy-gen:latest
-
-run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/data -e CADDY_GEN_OUTFILE=/data/docker-sites.caddy gera2ld/caddy-gen:latest
-
-dev: go run main.go
+dev:
+  go run main.go
