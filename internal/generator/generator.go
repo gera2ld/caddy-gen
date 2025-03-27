@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -62,11 +63,16 @@ func (g *Generator) groupSiteConfigs(siteConfigs []SiteConfig) map[string][]Site
 }
 
 func (g *Generator) generateCaddyConfig(groups map[string][]SiteConfig) string {
+	keys := make([]string, 0, len(groups))
+	for key := range groups {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	var configParts []string
-	i := 0
-	for hostnames, group := range groups {
+	for i, hostnames := range keys {
+		group := groups[hostnames]
 		configParts = append(configParts, g.generateHostConfig(hostnames, group, i))
-		i++
 	}
 	return strings.Join(configParts, "\n\n")
 }
