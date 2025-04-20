@@ -51,7 +51,6 @@ func (c *Client) createNetworkFilter() filters.Args {
 	args := filters.NewArgs()
 	args.Add("network", c.config.Network)
 	args.Add("status", "created")
-	args.Add("status", "restarting")
 	args.Add("status", "running")
 	return args
 }
