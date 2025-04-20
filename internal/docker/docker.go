@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -37,17 +37,15 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-// ListContainers lists containers in the specified network
-func (c *Client) ListContainers() ([]types.Container, error) {
+func (c *Client) ListContainers() ([]container.Summary, error) {
 	ctx := context.Background()
-	args := c.createNetworkFilter()
-	return c.client.ContainerList(ctx, types.ContainerListOptions{
+	args := c.createListFilter()
+	return c.client.ContainerList(ctx, container.ListOptions{
 		Filters: args,
 	})
 }
 
-// createNetworkFilter creates a filter for containers in the specified network
-func (c *Client) createNetworkFilter() filters.Args {
+func (c *Client) createListFilter() filters.Args {
 	args := filters.NewArgs()
 	args.Add("network", c.config.Network)
 	args.Add("status", "created")
@@ -72,7 +70,6 @@ func (c *Client) Notify() {
 	c.executeCommand(ctx, c.config.Notify)
 }
 
-// executeCommand creates and executes a command in the container
 func (c *Client) executeCommand(ctx context.Context, notifyConfig *config.NotifyConfig) {
 	execConfig := c.createExecConfig(notifyConfig)
 	resp, err := c.client.ContainerExecCreate(ctx, notifyConfig.ContainerID, execConfig)
@@ -80,15 +77,14 @@ func (c *Client) executeCommand(ctx context.Context, notifyConfig *config.Notify
 		log.Printf("Failed to create exec: %v", err)
 		return
 	}
-	err = c.client.ContainerExecStart(ctx, resp.ID, types.ExecStartCheck{})
+	err = c.client.ContainerExecStart(ctx, resp.ID, container.ExecStartOptions{})
 	if err != nil {
 		log.Printf("Failed to start exec: %v", err)
 	}
 }
 
-// createExecConfig creates an exec configuration for the container
-func (c *Client) createExecConfig(notifyConfig *config.NotifyConfig) types.ExecConfig {
-	return types.ExecConfig{
+func (c *Client) createExecConfig(notifyConfig *config.NotifyConfig) container.ExecOptions {
+	return container.ExecOptions{
 		Cmd:          notifyConfig.Command,
 		WorkingDir:   notifyConfig.WorkingDir,
 		AttachStdout: false,
@@ -117,7 +113,7 @@ func (c *Client) createEventFilter() filters.Args {
 // watchEventLoop watches for Docker events in a loop
 func (c *Client) watchEventLoop(ctx context.Context, args filters.Args, callback func()) {
 	for {
-		messages, errs := c.client.Events(ctx, types.EventsOptions{
+		messages, errs := c.client.Events(ctx, events.ListOptions{
 			Filters: args,
 		})
 		c.processEvents(messages, errs, callback)
