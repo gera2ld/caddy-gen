@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN go mod download
 COPY main.go ./
 COPY internal/ ./internal/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o caddy-gen .
+RUN CGO_ENABLED=0 go build -ldflags '-s -w' -trimpath -o caddy-gen ./cmd/caddygen
 
 FROM alpine:latest
 

@@ -1,0 +1,25 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '^1.24.3'
+      - name: Build
+        run: go run build.go
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*
