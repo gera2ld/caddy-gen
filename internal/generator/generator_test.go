@@ -3,7 +3,7 @@ package generator
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/gera2ld/caddy-gen/internal/config"
 	"github.com/gera2ld/caddy-gen/internal/docker"
@@ -11,9 +11,10 @@ import (
 
 func TestParseBindInfo(t *testing.T) {
 	// Create test container
-	container := types.Container{
-		Names: []string{"/test-container"},
-		NetworkSettings: &types.SummaryNetworkSettings{
+	container := container.Summary{
+		Names:  []string{"/test-container"},
+		Labels: map[string]string{},
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"gateway": {
 					IPAddress: "172.17.0.2",
@@ -28,12 +29,13 @@ func TestParseBindInfo(t *testing.T) {
 	generator := NewGenerator(dockerClient, cfg)
 
 	// Test simple bind
-	bindInfo := "80 example.com"
-	siteConfig, err := generator.parseBindInfo(bindInfo, container)
-	if err != nil {
-		t.Fatalf("parseBindInfo() error = %v", err)
+	container.Labels["virtual.bind"] = "80 example.com"
+	configs := generator.processContainer(container)
+	if len(configs) != 1 {
+		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
-	if len(siteConfig.Hostnames) != 1 || siteConfig.Hostnames[0] != "example.com" {
+	siteConfig := configs[0]
+	if siteConfig.Hostnames[0] != "example.com" {
 		t.Errorf("siteConfig.Hostnames = %v; want [example.com]", siteConfig.Hostnames)
 	}
 	if siteConfig.Port != 80 {
@@ -50,21 +52,25 @@ func TestParseBindInfo(t *testing.T) {
 	}
 
 	// Test bind with path
-	bindInfo = "/api 80 example.com"
-	siteConfig, err = generator.parseBindInfo(bindInfo, container)
-	if err != nil {
-		t.Fatalf("parseBindInfo() error = %v", err)
+	container.Labels["virtual.bind"] = "80 /api example.com"
+	configs = generator.processContainer(container)
+	if len(configs) != 1 {
+		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
+	siteConfig = configs[0]
 	if siteConfig.PathMatcher != "/api" {
 		t.Errorf("siteConfig.PathMatcher = %s; want /api", siteConfig.PathMatcher)
 	}
 
 	// Test bind with directives
-	bindInfo = "80 example.com | host:tls internal | header Server \"My Server\""
-	siteConfig, err = generator.parseBindInfo(bindInfo, container)
-	if err != nil {
-		t.Fatalf("parseBindInfo() error = %v", err)
+	container.Labels["virtual.bind"] = `80 example.com
+header Server "My Server"
+host:tls internal`
+	configs = generator.processContainer(container)
+	if len(configs) != 1 {
+		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
+	siteConfig = configs[0]
 	if len(siteConfig.HostDirectives) != 1 || siteConfig.HostDirectives[0] != "tls internal" {
 		t.Errorf("siteConfig.HostDirectives = %v; want [tls internal]", siteConfig.HostDirectives)
 	}
@@ -73,21 +79,22 @@ func TestParseBindInfo(t *testing.T) {
 	}
 
 	// Test invalid bind
-	bindInfo = "invalid"
-	_, err = generator.parseBindInfo(bindInfo, container)
-	if err == nil {
-		t.Errorf("parseBindInfo() error = nil; want error")
+	container.Labels["virtual.bind"] = "Invalid"
+	configs = generator.processContainer(container)
+	if len(configs) != 0 {
+		t.Errorf("configs = %v; want no config", configs)
 	}
 }
 
 func TestProcessContainer(t *testing.T) {
 	// Create test container
-	container := types.Container{
+	container := container.Summary{
 		Names: []string{"/test-container"},
 		Labels: map[string]string{
-			"virtual.bind": "80 example.com; /api 8080 api.example.com",
+			"virtual.bind": `80 example.com
+8080 /api api.example.com`,
 		},
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"gateway": {
 					IPAddress: "172.17.0.2",
@@ -116,4 +123,5 @@ func TestProcessContainer(t *testing.T) {
 	if configs[1].Port != 8080 || configs[1].Hostnames[0] != "api.example.com" || configs[1].PathMatcher != "/api" {
 		t.Errorf("configs[1] = %+v; want Port=8080, Hostnames=[api.example.com], PathMatcher=/api", configs[1])
 	}
-} 
+}
+

@@ -45,6 +45,7 @@ func ParseNotifyConfig(raw string) *NotifyConfig {
 		err := json.Unmarshal([]byte(raw), &config)
 		if err != nil {
 			log.Printf("Failed to parse CADDY_GEN_NOTIFY: %v", err)
+			return nil
 		}
 	}
 

@@ -2,7 +2,10 @@ default:
   just --list
 
 build:
-  CGO_ENABLED=0 go build -ldflags='-s -w' -trimpath -o caddy-gen .
+  go run build.go
 
 dev:
   go run main.go
+
+test:
+  go test ./internal/...

@@ -75,12 +75,12 @@ just dev
 The `virtual.bind` label supports the following format:
 
 ```
-[PATH] PORT HOSTNAME1 [HOSTNAME2...] [| DIRECTIVE1] [| DIRECTIVE2...]
+PORT [PATH] HOSTNAME1 [HOSTNAME2...]
+DIRECTIVE1
+DIRECTIVE2
 ```
 
 - `PATH`: Optional path prefix for the reverse proxy
 - `PORT`: The port to proxy to
 - `HOSTNAME`: One or more hostnames to match
 - `DIRECTIVE`: Optional directives, prefixed with `host:` for host-level directives or without prefix for proxy-level directives
-
-Multiple bindings can be separated by semicolons (`;`).

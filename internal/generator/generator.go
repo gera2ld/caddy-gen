@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/gera2ld/caddy-gen/internal/config"
 	"github.com/gera2ld/caddy-gen/internal/docker"
 )
@@ -44,10 +44,10 @@ func (g *Generator) GenerateConfig() (string, error) {
 	return g.generateCaddyConfig(groups), nil
 }
 
-func (g *Generator) processSiteConfigs(containers []types.Container) []SiteConfig {
+func (g *Generator) processSiteConfigs(containers []container.Summary) []SiteConfig {
 	var siteConfigs []SiteConfig
-	for _, container := range containers {
-		configs := g.processContainer(container)
+	for _, ct := range containers {
+		configs := g.processContainer(ct)
 		siteConfigs = append(siteConfigs, configs...)
 	}
 	return siteConfigs
@@ -108,70 +108,53 @@ func (g *Generator) generateDirectives(group []SiteConfig, directiveType string)
 	return lines
 }
 
-func (g *Generator) processContainer(container types.Container) []SiteConfig {
+func (g *Generator) processContainer(ct container.Summary) []SiteConfig {
 	var configs []SiteConfig
-	rawBind, exists := container.Labels["virtual.bind"]
+	rawBind, exists := ct.Labels["virtual.bind"]
 	if !exists || strings.TrimSpace(rawBind) == "" {
 		return configs
 	}
-	for _, bindInfo := range strings.Split(rawBind, ";") {
+	var config *SiteConfig = nil
+	for _, bindInfo := range strings.Split(rawBind, "\n") {
 		bindInfo = strings.TrimSpace(bindInfo)
-		if bindInfo == "" {
+		if bindInfo == "" || bindInfo[0] == '#' {
 			continue
 		}
-		config, err := g.parseBindInfo(bindInfo, container)
-		if err != nil {
-			log.Printf("Error parsing bind info for container %s: %v", container.Names[0], err)
+		parts := strings.Fields(bindInfo)
+		port, err := strconv.Atoi(parts[0])
+		if err == nil {
+			var proxyIP string
+			if networkSettings, exists := ct.NetworkSettings.Networks[g.config.Network]; exists {
+				proxyIP = networkSettings.IPAddress
+			}
+			configs = append(configs, SiteConfig{
+				Name:    strings.TrimPrefix(ct.Names[0], "/"),
+				Port:    port,
+				ProxyIP: proxyIP,
+			})
+			config = &configs[len(configs)-1]
+			if strings.HasPrefix(parts[1], "/") {
+				config.PathMatcher = parts[1]
+				config.Hostnames = parts[2:]
+			} else {
+				config.Hostnames = parts[1:]
+			}
 			continue
 		}
-		configs = append(configs, config)
+		if config == nil {
+			log.Printf("Ignored invalid config: %s\n", bindInfo)
+			continue
+		}
+		g.processDirective(bindInfo, config)
 	}
 	return configs
 }
 
-func (g *Generator) parseBindInfo(bindInfo string, container types.Container) (SiteConfig, error) {
-	bindParts := strings.Split(bindInfo, "|")
-	bind := strings.TrimSpace(bindParts[0])
-	directives := bindParts[1:]
-	bindElements := strings.Fields(bind)
-	var path string
-	if strings.HasPrefix(bind, "/") {
-		path = bindElements[0]
-		bindElements = bindElements[1:]
+func (g *Generator) processDirective(directive string, config *SiteConfig) {
+	directive = strings.TrimSpace(directive)
+	if strings.HasPrefix(directive, "host:") {
+		config.HostDirectives = append(config.HostDirectives, strings.TrimSpace(directive[5:]))
+	} else {
+		config.ProxyDirectives = append(config.ProxyDirectives, directive)
 	}
-	if len(bindElements) < 2 {
-		return SiteConfig{}, fmt.Errorf("invalid bind format: %s", bind)
-	}
-	port, err := strconv.Atoi(bindElements[0])
-	if err != nil {
-		return SiteConfig{}, fmt.Errorf("invalid port in binding %s: %v", bind, err)
-	}
-	hostnames := bindElements[1:]
-	hostDirectives, proxyDirectives := g.processDirectives(directives)
-	var proxyIP string
-	if networkSettings, exists := container.NetworkSettings.Networks[g.config.Network]; exists {
-		proxyIP = networkSettings.IPAddress
-	}
-	return SiteConfig{
-		Hostnames:       hostnames,
-		Port:            port,
-		PathMatcher:     path,
-		Name:            strings.TrimPrefix(container.Names[0], "/"),
-		HostDirectives:  hostDirectives,
-		ProxyDirectives: proxyDirectives,
-		ProxyIP:         proxyIP,
-	}, nil
-}
-
-func (g *Generator) processDirectives(directives []string) ([]string, []string) {
-	var hostDirectives, proxyDirectives []string
-	for _, directive := range directives {
-		directive = strings.TrimSpace(directive)
-		if strings.HasPrefix(directive, "host:") {
-			hostDirectives = append(hostDirectives, strings.TrimSpace(directive[5:]))
-		} else {
-			proxyDirectives = append(proxyDirectives, directive)
-		}
-	}
-	return hostDirectives, proxyDirectives
 }

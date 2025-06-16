@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -9,12 +10,12 @@ func TestGetEnv(t *testing.T) {
 	// Test with existing environment variable
 	os.Setenv("TEST_ENV_VAR", "test_value")
 	defer os.Unsetenv("TEST_ENV_VAR")
-	
+
 	result := GetEnv("TEST_ENV_VAR", "default_value")
 	if result != "test_value" {
 		t.Errorf("GetEnv() = %s; want test_value", result)
 	}
-	
+
 	// Test with non-existing environment variable
 	result = GetEnv("NON_EXISTING_VAR", "default_value")
 	if result != "default_value" {
@@ -26,7 +27,7 @@ func TestParseNotifyConfig(t *testing.T) {
 	// Test with valid JSON
 	validJSON := `{"containerId":"test-container","workingDir":"/app","command":["caddy","reload"]}`
 	config := ParseNotifyConfig(validJSON)
-	
+
 	if config == nil {
 		t.Fatal("ParseNotifyConfig() returned nil for valid JSON")
 	}
@@ -39,13 +40,13 @@ func TestParseNotifyConfig(t *testing.T) {
 	if len(config.Command) != 2 || config.Command[0] != "caddy" || config.Command[1] != "reload" {
 		t.Errorf("config.Command = %v; want [caddy reload]", config.Command)
 	}
-	
+
 	// Test with empty string
 	config = ParseNotifyConfig("")
-	if config != nil {
-		t.Errorf("ParseNotifyConfig() = %v; want nil", config)
+	if config == nil || strings.Join(config.Command, " ") != "caddy reload" {
+		t.Errorf("ParseNotifyConfig() = %v; want default config", config)
 	}
-	
+
 	// Test with invalid JSON
 	config = ParseNotifyConfig("{invalid json}")
 	if config != nil {
@@ -63,9 +64,9 @@ func TestNewConfig(t *testing.T) {
 		os.Unsetenv("CADDY_GEN_OUTFILE")
 		os.Unsetenv("CADDY_GEN_NOTIFY")
 	}()
-	
+
 	config := NewConfig()
-	
+
 	if config.Network != "test-network" {
 		t.Errorf("config.Network = %s; want test-network", config.Network)
 	}
@@ -78,4 +79,4 @@ func TestNewConfig(t *testing.T) {
 	if config.Notify.ContainerID != "test-container" {
 		t.Errorf("config.Notify.ContainerID = %s; want test-container", config.Notify.ContainerID)
 	}
-} 
+}
