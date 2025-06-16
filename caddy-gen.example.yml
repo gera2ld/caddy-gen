@@ -28,11 +28,14 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     labels:
-      virtual.bind: 80 example.com | host:tls {
-        dns cloudflare {env.CF_API_TOKEN}
-      } | header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-      }
+      virtual.bind: |
+        80 example.com
+        host:tls {
+          dns cloudflare {env.CF_API_TOKEN}
+        }
+        header {
+          Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        }
     networks:
       - gateway
 

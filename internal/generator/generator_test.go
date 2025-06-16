@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -30,7 +31,10 @@ func TestParseBindInfo(t *testing.T) {
 
 	// Test simple bind
 	container.Labels["virtual.bind"] = "80 example.com"
-	configs := generator.processContainer(container)
+	configs, err := generator.processContainer(container)
+	if err != nil {
+		t.Errorf("Error: %s", err)
+	}
 	if len(configs) != 1 {
 		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
@@ -53,7 +57,10 @@ func TestParseBindInfo(t *testing.T) {
 
 	// Test bind with path
 	container.Labels["virtual.bind"] = "80 /api example.com"
-	configs = generator.processContainer(container)
+	configs, err = generator.processContainer(container)
+	if err != nil {
+		t.Errorf("Error: %s", err)
+	}
 	if len(configs) != 1 {
 		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
@@ -65,13 +72,19 @@ func TestParseBindInfo(t *testing.T) {
 	// Test bind with directives
 	container.Labels["virtual.bind"] = `80 example.com
 header Server "My Server"
-host:tls internal`
-	configs = generator.processContainer(container)
+host:tls {
+internal
+}`
+	configs, err = generator.processContainer(container)
+	if err != nil {
+		t.Errorf("Error: %s", err)
+	}
 	if len(configs) != 1 {
 		t.Errorf("configs = %v; want exactly 1 config", configs)
 	}
 	siteConfig = configs[0]
-	if len(siteConfig.HostDirectives) != 1 || siteConfig.HostDirectives[0] != "tls internal" {
+	fmt.Printf("%v\n", siteConfig.HostDirectives[0])
+	if len(siteConfig.HostDirectives) != 1 || siteConfig.HostDirectives[0] != "tls {\ninternal\n}" {
 		t.Errorf("siteConfig.HostDirectives = %v; want [tls internal]", siteConfig.HostDirectives)
 	}
 	if len(siteConfig.ProxyDirectives) != 1 || siteConfig.ProxyDirectives[0] != "header Server \"My Server\"" {
@@ -80,7 +93,10 @@ host:tls internal`
 
 	// Test invalid bind
 	container.Labels["virtual.bind"] = "Invalid"
-	configs = generator.processContainer(container)
+	configs, err = generator.processContainer(container)
+	if err != nil {
+		t.Errorf("Error: %s", err)
+	}
 	if len(configs) != 0 {
 		t.Errorf("configs = %v; want no config", configs)
 	}
@@ -109,7 +125,10 @@ func TestProcessContainer(t *testing.T) {
 	generator := NewGenerator(dockerClient, cfg)
 
 	// Test process container
-	configs := generator.processContainer(container)
+	configs, err := generator.processContainer(container)
+	if err != nil {
+		t.Errorf("Error: %s", err)
+	}
 	if len(configs) != 2 {
 		t.Fatalf("processContainer() returned %d configs; want 2", len(configs))
 	}

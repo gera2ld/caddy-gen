@@ -47,7 +47,10 @@ func (g *Generator) GenerateConfig() (string, error) {
 func (g *Generator) processSiteConfigs(containers []container.Summary) []SiteConfig {
 	var siteConfigs []SiteConfig
 	for _, ct := range containers {
-		configs := g.processContainer(ct)
+		configs, err := g.processContainer(ct)
+		if err != nil {
+			log.Printf("Site config error: %s", err)
+		}
 		siteConfigs = append(siteConfigs, configs...)
 	}
 	return siteConfigs
@@ -108,19 +111,26 @@ func (g *Generator) generateDirectives(group []SiteConfig, directiveType string)
 	return lines
 }
 
-func (g *Generator) processContainer(ct container.Summary) []SiteConfig {
+func (g *Generator) processContainer(ct container.Summary) ([]SiteConfig, error) {
 	var configs []SiteConfig
 	rawBind, exists := ct.Labels["virtual.bind"]
 	if !exists || strings.TrimSpace(rawBind) == "" {
-		return configs
+		return configs, nil
 	}
+	lines := strings.Split(rawBind, "\n")
 	var config *SiteConfig = nil
-	for _, bindInfo := range strings.Split(rawBind, "\n") {
-		bindInfo = strings.TrimSpace(bindInfo)
-		if bindInfo == "" || bindInfo[0] == '#' {
+	brackets := 0
+	offset := 0
+	for offset < len(lines) {
+		line := strings.TrimSpace(lines[offset])
+		offset += 1
+
+		if line == "" || line[0] == '#' {
 			continue
 		}
-		parts := strings.Fields(bindInfo)
+
+		// Check if line is a new port binding
+		parts := strings.Fields(line)
 		port, err := strconv.Atoi(parts[0])
 		if err == nil {
 			var proxyIP string
@@ -141,13 +151,32 @@ func (g *Generator) processContainer(ct container.Summary) []SiteConfig {
 			}
 			continue
 		}
+
+		// No port binding yet
 		if config == nil {
-			log.Printf("Ignored invalid config: %s\n", bindInfo)
+			log.Printf("Ignored invalid config: %s\n", line)
 			continue
 		}
-		g.processDirective(bindInfo, config)
+
+		// Directives can be wrapped with brackets
+		if strings.HasSuffix(line, "{") {
+			brackets += 1
+		}
+		directive := line
+		for brackets > 0 && offset < len(lines) {
+			line = lines[offset]
+			offset += 1
+			directive += "\n" + line
+			if strings.TrimSpace(line) == "}" {
+				brackets -= 1
+			}
+		}
+		if brackets > 0 {
+			return configs, fmt.Errorf("unexpected end of config")
+		}
+		g.processDirective(directive, config)
 	}
-	return configs
+	return configs, nil
 }
 
 func (g *Generator) processDirective(directive string, config *SiteConfig) {

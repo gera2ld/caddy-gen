@@ -34,7 +34,11 @@ services:
   my-service:
     # ...
     labels:
-      virtual.bind: 80 my-service.example.com
+      virtual.bind: |
+        80 my-service.example.com
+        host:tls {
+          internal
+        }
 
 networks:
   default:
